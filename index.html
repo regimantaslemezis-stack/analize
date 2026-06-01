@@ -394,7 +394,7 @@ f<!DOCTYPE html>
         var evalBefore = stockfishEvals[moveIndex-1] || 0;
         var evalAfter = stockfishEvals[moveIndex] || 0;
         
-        var url = `${GOOGLE_SCRIPT_URL}?move=${encodeURIComponent(move.san)}&fen=${encodeURIComponent(fen)}&best=${encodeURIComponent(best)}&cpl=${cpl}&evalBefore=${evalBefore}&evalAfter=${evalAfter}`;
+var url = `${GOOGLE_SCRIPT_URL}?move=${encodeURIComponent(move.san)}&fen=${encodeURIComponent(fen)}&best=${encodeURIComponent(best)}&cpl=${cpl}&evalBefore=${evalBefore}&evalAfter=${evalAfter}&moveNumber=${moveIndex}&color=${move.color}`;
         try {
             var response = await fetch(url);
             var text = await response.text();
