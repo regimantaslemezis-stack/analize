@@ -1,0 +1,538 @@
+f<!DOCTYPE html>
+<html lang="lt">
+<head>
+    <meta charset="UTF-8">
+    <title>Chess OS - AI Treneris (Nuosekli analizė)</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.css">
+    <style>
+        /* Tavo stiliai – tie patys (be rodyklių) */
+        body { font-family: 'Segoe UI', sans-serif; background-color: #161512; color: #e0e0e0; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; padding: 10px; }
+        .container { display: flex; gap: 20px; background-color: #262421; padding: 20px; border-radius: 12px; height: 90vh; width: 95vw; max-width: 1600px; align-items: stretch; }
+        .eval-bar-container { width: 35px; background-color: #1a1816; border-radius: 6px; overflow: hidden; display: flex; flex-direction: column; position: relative; border: 1px solid #403e3b; }
+        .eval-bar-white { background-color: #f0f0f0; height: 50%; transition: height 0.3s ease; width: 100%; }
+        .eval-text { position: absolute; width: 100%; text-align: center; font-size: 13px; font-weight: bold; color: #fff; text-shadow: 1px 1px 0 #000; bottom: 8px; left: 0; z-index: 10; }
+        #board { width: 40%; min-width: 450px; }
+        .info-panel { width: 60%; display: flex; flex-direction: column; gap: 15px; height: 100%; min-width: 450px; }
+        .status-box { background-color: #2a2825; padding: 12px; border-radius: 8px; border: 1px solid #403e3b; }
+        .commentary-box { background-color: #1e1c18; border-left: 5px solid #d4942a; padding: 20px; border-radius: 8px; height: 350px; overflow-y: auto; font-size: 14px; line-height: 1.6; }
+        .commentary-box::-webkit-scrollbar { width: 10px; }
+        .commentary-box::-webkit-scrollbar-track { background: #262421; border-radius: 5px; }
+        .commentary-box::-webkit-scrollbar-thumb { background: #d4942a; border-radius: 5px; }
+        .moves-list-container { background-color: #1a1816; border-radius: 8px; border: 1px solid #403e3b; height: 280px; overflow-y: auto; }
+        .moves-list { padding: 10px; display: flex; flex-direction: column; gap: 2px; }
+        .move-item { padding: 8px 12px; border-radius: 6px; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 12px; border-left: 3px solid transparent; }
+        .move-item:hover { background-color: #3a3530; transform: translateX(3px); }
+        .move-item.active { background-color: #5a8f2c; border-left-color: #ffd966; }
+        .move-number { color: #8bc34a; font-weight: bold; min-width: 45px; font-size: 13px; }
+        .white-move { color: #f0f0f0; font-weight: 500; min-width: 70px; }
+        .black-move { color: #aaaaaa; font-weight: 500; min-width: 70px; }
+        .move-san { font-family: monospace; font-size: 14px; }
+        .move-eval { font-size: 10px; color: #d4942a; margin-left: 5px; font-family: monospace; }
+        h3 { margin-top: 0; color: #8bc34a; border-bottom: 1px solid #403e3b; padding-bottom: 8px; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; }
+        .btn-group { display: flex; gap: 10px; }
+        button { flex: 1; padding: 10px; background-color: #5a8f2c; border: none; color: white; font-weight: bold; border-radius: 6px; cursor: pointer; font-size: 13px; }
+        button:hover { background-color: #7ab83a; transform: scale(1.01); }
+        button:disabled { background-color: #403e3b; color: #73716e; cursor: not-allowed; transform: none; }
+        textarea { width: 100%; height: 60px; background-color: #161512; color: #e0e0e0; border: 1px solid #403e3b; border-radius: 6px; padding: 8px; resize: vertical; font-family: monospace; font-size: 12px; }
+        textarea:disabled { background-color: #2a2825; color: #888; }
+        .stats-table { width: 100%; border-collapse: collapse; font-size: 11px; text-align: center; margin-top: 5px; }
+        .stats-table th, .stats-table td { padding: 4px; border-bottom: 1px solid #403e3b; }
+        .accuracy-row { font-weight: bold; font-size: 13px; background-color: #1f1d1a; }
+        .analyzing { text-align: center; padding: 20px; color: #8bc34a; font-style: italic; }
+        .progress-bar { width: 100%; height: 3px; background-color: #403e3b; border-radius: 2px; margin-top: 8px; }
+        .progress-fill { height: 100%; background-color: #8bc34a; width: 0%; transition: width 0.3s ease; }
+        .status-ok { background-color: #3a5a2a30; border-left: 3px solid #8bc34a; padding: 5px 8px; margin-bottom: 8px; font-size: 11px; border-radius: 4px; }
+        .status-error { background-color: #5a2a2a30; border-left: 3px solid #ef5350; padding: 5px 8px; margin-bottom: 8px; font-size: 11px; border-radius: 4px; color: #ff8888; }
+        .game-info { background: linear-gradient(135deg, #2a2825 0%, #1f1d1a 100%); border-radius: 6px; padding: 8px 12px; margin-bottom: 8px; font-size: 12px; display: flex; justify-content: space-between; align-items: center; }
+        .elo-badge { background-color: #5a8f2c30; padding: 2px 6px; border-radius: 4px; font-size: 10px; }
+        .pgn-wrapper { position: relative; display: flex; gap: 10px; align-items: center; }
+        .file-input-label { background-color: #5a8f2c; padding: 8px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; white-space: nowrap; }
+        .file-input-label:hover { background-color: #7ab83a; }
+        #pgnFile { display: none; }
+        .clear-pgn-btn { background-color: #d4942a; border: none; color: white; font-size: 11px; padding: 3px 8px; border-radius: 4px; cursor: pointer; white-space: nowrap; }
+        .clear-pgn-btn:hover { background-color: #e8a83a; }
+        .recommendation { background-color: #2a251f; padding: 8px; border-radius: 6px; margin-top: 8px; border-left: 3px solid #8bc34a; font-size: 12px; }
+        .fun-fact { background-color: #1a1a1a; padding: 10px; border-radius: 6px; margin-top: 12px; }
+        .engine-spinner { display: inline-block; width: 12px; height: 12px; border: 2px solid #8bc34a; border-top-color: transparent; border-radius: 50%; animation: spin 0.8s linear infinite; margin-left: 8px; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="eval-bar-container"><div id="evalWhite" class="eval-bar-white"></div><div id="evalValue" class="eval-text">0.0</div></div>
+    <div id="board"></div>
+    <div class="info-panel">
+        <div class="status-box" id="summary-box" style="display: none;">
+            <div class="game-info"><span>⚪ <span id="white-name">Baltieji</span> <span id="white-elo" class="elo-badge">ELO: —</span></span><span>VS</span><span>⚫ <span id="black-name">Juodieji</span> <span id="black-elo" class="elo-badge">ELO: —</span></span></div>
+            <div id="engine-status" class="status-ok" style="display: none;">✅ Stockfish aktyvus <span class="engine-spinner"></span></div>
+            <div id="engine-error" class="status-error" style="display: none;">❌ Stockfish nepasiekiamas!</div>
+            <div id="analysis-progress" style="display: none;"><div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div><div style="font-size: 10px; text-align: center;" id="progress-text">Analizuojama...</div></div>
+            <table class="stats-table"><thead><tr><th>Rodiklis</th><th>⚪</th><th>⚫</th></tr></thead>
+            <tbody>
+                <tr class="accuracy-row"><td>Tikslumas (CAP)</th><td id="stat-w-acc">0%<\/td><td id="stat-b-acc">0%<\/td><\/tr>
+                <tr><td>🔥 Puikūs<\/td><td id="stat-w-great">0<\/td><td id="stat-b-great">0<\/td><\/tr>
+                <tr><td>🟢 Tikslūs<\/td><td id="stat-w-best">0<\/td><td id="stat-b-best">0<\/td><\/tr>
+                <tr><td>🟡 Netikslumai<\/td><td id="stat-w-inacc">0<\/td><td id="stat-b-inacc">0<\/td><\/tr>
+                <tr><td>🟠 Klaidos<\/td><td id="stat-w-mist">0<\/td><td id="stat-b-mist">0<\/td><\/tr>
+                <tr><td>🔴 Kritinės<\/td><td id="stat-w-blund">0<\/td><td id="stat-b-blund">0<\/td><\/tr>
+            </tbody>
+            </table>
+        </div>
+        <div class="moves-list-container"><h3>📋 Ėjimų sąrašas</h3><div class="moves-list" id="moves-list">Užkraukite PGN partiją</div></div>
+        <div class="commentary-box"><h3 style="color: #d4942a;">🎓 Trenerio komentaras (AI)</h3><div id="commentary-text">Laukiama PGN partijos...</div></div>
+        <div class="btn-group"><button id="btnStart">⏮ Pradžia</button><button id="btnPrev">◀ Atgal</button><button id="btnNext">Pirmyn ▶</button><button id="btnEnd">Pabaiga ⏭</button></div>
+        <div class="status-box"><h3>📁 Įkelti PGN</h3><div class="pgn-wrapper"><textarea id="pgnInput" placeholder="Įklijuok PGN partiją čia..."></textarea><label for="pgnFile" class="file-input-label">📂 Pasirinkti failą</label><input type="file" id="pgnFile" accept=".pgn,.txt"><button id="btnClearPgn" class="clear-pgn-btn" style="display: none;">✖ Išvalyti</button></div><button id="btnLoad" style="margin-top: 8px; width: 100%;">🔍 Analizuoti partiją</button></div>
+    </div>
+</div>
+
+<script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.js"></script>
+
+<script>
+    // ========== GLOBALŪS KINTAMIEJI ==========
+    var game = new Chess();
+    var board = null;
+    var moveHistory = [game.fen()];
+    var verboseHistory = [null];
+    var currentMoveIndex = 0;
+    
+    var stockfishEvals = [];
+    var bestEvalsGlobal = [];
+    var bestLines = [];
+    var moveCPL = [];
+    var bestMoveSAN = [];
+    
+    var isAnalyzing = false;
+    var movesList = [];
+    var commentsHistory = [];
+    var commentCache = new Map();
+    
+    var analysisCache = new Map();
+    var gameMetadata = { white: "Žaidėjas", black: "Žaidėjas", whiteElo: "—", blackElo: "—" };
+    var stats = { w: { great:0, best:0, inacc:0, mist:0, blund:0 }, b: { great:0, best:0, inacc:0, mist:0, blund:0 } };
+
+    var stockfish = null;
+    var stockfishReady = false;
+    var stockfishErrorShown = false;
+    
+    var pendingAnalyses = new Map();
+    var analysisIdCounter = 0;
+    
+    // ========== PAGALBINĖS FUNKCIJOS ==========
+    function extractMetadata(pgnText) {
+        var m = { white: "Žaidėjas", black: "Žaidėjas", whiteElo: "—", blackElo: "—" };
+        var w = pgnText.match(/\[White\s+"([^"]+)"\]/);
+        var b = pgnText.match(/\[Black\s+"([^"]+)"\]/);
+        var we = pgnText.match(/\[WhiteElo\s+"([^"]+)"\]/);
+        var be = pgnText.match(/\[BlackElo\s+"([^"]+)"\]/);
+        if (w) m.white = w[1];
+        if (b) m.black = b[1];
+        if (we) m.whiteElo = we[1];
+        if (be) m.blackElo = be[1];
+        return m;
+    }
+    function updateGameInfoUI() {
+        $('#white-name').html(gameMetadata.white);
+        $('#black-name').html(gameMetadata.black);
+        $('#white-elo').html('ELO: ' + gameMetadata.whiteElo);
+        $('#black-elo').html('ELO: ' + gameMetadata.blackElo);
+    }
+    function getDepthForMove(moveIndex, totalMoves) {
+        return 6;  // Stabili ir greita
+    }
+    function calculateAccuracyFromCPL(avgCPL) {
+        if (avgCPL === undefined || isNaN(avgCPL)) return 100;
+        var acc = 103.1668 * Math.exp(-0.04354 * avgCPL);
+        return Math.min(100, Math.max(0, acc));
+    }
+    function classifyMoveByCPL(cpl, prevEval) {
+        var absPrev = Math.abs(prevEval);
+        if (cpl < 20) return 'best';
+        if (cpl < 50) return 'great';
+        if (absPrev > 5) {
+            if (cpl < 150) return 'good';
+            if (cpl < 300) return 'inaccuracy';
+            if (cpl < 500) return 'mistake';
+            return 'blunder';
+        }
+        if (cpl < 80) return 'good';
+        if (cpl < 150) return 'inaccuracy';
+        if (cpl < 300) return 'mistake';
+        return 'blunder';
+    }
+    
+    // ========== STOCKFISH (BE MULTIPV) ==========
+    function parseOutput(line) {
+        var result = { score: null, pv: null, depth: null };
+        var cpMatch = line.match(/score cp (-?\d+)/);
+        var pvMatch = line.match(/pv ([a-h][1-8][a-h][1-8][nbrq]? ?)+/);
+        var depthMatch = line.match(/depth (\d+)/);
+        if (cpMatch) result.score = parseInt(cpMatch[1]) / 100;
+        if (pvMatch) result.pv = pvMatch[1];
+        if (depthMatch) result.depth = parseInt(depthMatch[1]);
+        return result;
+    }
+    async function getAnalysisWithCache(fen, moveIndex, requiredDepth) {
+        if (analysisCache.has(fen)) return analysisCache.get(fen);
+        var result = await sendStockfishCommand(fen, moveIndex, requiredDepth);
+        analysisCache.set(fen, result);
+        return result;
+    }
+    function sendStockfishCommand(fen, moveIndex, depth, retryCount = 0) {
+        if (!stockfishReady) return Promise.reject('Stockfish not ready');
+        var analysisId = analysisIdCounter++;
+        var promise = new Promise((resolve, reject) => {
+            var timeout = setTimeout(() => {
+                if (pendingAnalyses.has(analysisId)) {
+                    var pending = pendingAnalyses.get(analysisId);
+                    if (pending.retryCount < 2) {
+                        pending.retryCount++;
+                        sendStockfishCommand(fen, moveIndex, depth, pending.retryCount);
+                    } else {
+                        pendingAnalyses.delete(analysisId);
+                        reject(new Error('Timeout'));
+                    }
+                }
+            }, 20000);
+            pendingAnalyses.set(analysisId, {
+                resolve, reject, moveIndex, fen,
+                requiredDepth: depth, retryCount,
+                bestScore: null, bestLine: null, bestMoveSAN: null,
+                timeout, resolved: false
+            });
+        });
+        stockfish.postMessage('stop');
+        setTimeout(() => {
+            stockfish.postMessage('position fen ' + fen);
+            stockfish.postMessage('go depth ' + depth);   // BE MULTIPV
+        }, 10);
+        return promise;
+    }
+    function parseAnalysisOutput(line) {
+        var parsed = parseOutput(line);
+        if (parsed.score === null) return;
+        for (var [id, pending] of pendingAnalyses) {
+            if (pending.resolved) continue;
+            if (parsed.depth && parsed.depth >= pending.requiredDepth) {
+                pending.bestScore = parsed.score;
+                pending.bestLine = parsed.pv;
+                if (parsed.pv) {
+                    var firstMove = parsed.pv.match(/[a-h][1-8][a-h][1-8][nbrq]?/);
+                    if (firstMove) {
+                        var from = firstMove[0].substring(0,2);
+                        var to = firstMove[0].substring(2,4);
+                        pending.bestMoveSAN = from + '-' + to;
+                    }
+                }
+                clearTimeout(pending.timeout);
+                pending.resolved = true;
+                pending.resolve({
+                    bestScore: pending.bestScore,
+                    bestLine: pending.bestLine,
+                    bestMoveSAN: pending.bestMoveSAN,
+                    moveIndex: pending.moveIndex
+                });
+                pendingAnalyses.delete(id);
+                break;
+            }
+        }
+    }
+    async function analyzePositionFen(fen, moveIndex, requiredDepth) {
+        if (!stockfishReady) {
+            await new Promise(r => setTimeout(r, 100));
+            if (!stockfishReady) throw new Error('Stockfish not ready');
+        }
+        return getAnalysisWithCache(fen, moveIndex, requiredDepth);
+    }
+    
+    // ========== NUOSEKLI ANALIZĖ (NE LYGIAGRETI) ==========
+    async function analyzeAllPositions(moves) {
+        console.log("🚀 Analizė pradedama, ėjimų skaičius:", moves.length);
+        if (!moves || moves.length === 0) { console.error("❌ Nėra ėjimų"); return; }
+        if (!stockfishReady) {
+            console.warn("⏳ Stockfish nepasiruošęs, bandome dar kartą...");
+            setTimeout(() => analyzeAllPositions(moves), 500);
+            return;
+        }
+        isAnalyzing = true;
+        $('#analysis-progress').show();
+        $('.engine-spinner').show();
+        
+        var totalMoves = moves.length;
+        var positions = [new Chess().fen()];
+        var temp = new Chess();
+        for (var i = 0; i < moves.length; i++) {
+            temp.move(moves[i]);
+            positions.push(temp.fen());
+        }
+        
+        var bestEvals = new Array(positions.length).fill(0);
+        var bestLinesArray = new Array(positions.length).fill('');
+        var bestMovesSAN = new Array(positions.length).fill('');
+        
+        for (var i = 0; i < positions.length; i++) {
+            var pct = Math.round((i / positions.length) * 100);
+            $('#progress-fill').css('width', pct + '%');
+            $('#progress-text').html(`Analizuojama ${i}/${positions.length}...`);
+            var depth = getDepthForMove(i, totalMoves);
+            try {
+                var result = await analyzePositionFen(positions[i], i, depth);
+                bestEvals[i] = result.bestScore;
+                bestLinesArray[i] = result.bestLine;
+                bestMovesSAN[i] = result.bestMoveSAN || '';
+            } catch(e) {
+                console.warn(`Pozicijos ${i} analizė nepavyko`, e);
+                bestEvals[i] = 0;
+            }
+            await new Promise(r => setTimeout(r, 20));
+        }
+        
+        var playedEvals = new Array(positions.length).fill(0);
+        for (var i = 0; i < positions.length - 1; i++) {
+            playedEvals[i+1] = bestEvals[i+1];
+        }
+        
+        var moveCPLArray = new Array(positions.length).fill(0);
+        for (var i = 1; i < positions.length; i++) {
+            var loss = (bestEvals[i-1] - playedEvals[i]) * 100;
+            var moveColor = moves[i-1] ? moves[i-1].color : 'w';
+            if (moveColor === 'b') loss = -loss;
+            moveCPLArray[i] = Math.max(0, loss);
+        }
+        
+        stockfishEvals = playedEvals;
+        bestEvalsGlobal = bestEvals;
+        bestLines = bestLinesArray;
+        bestMoveSAN = bestMovesSAN;
+        moveCPL = moveCPLArray;
+        
+        // Statistikos skaičiavimas
+        stats = { w: { great:0, best:0, inacc:0, mist:0, blund:0 }, b: { great:0, best:0, inacc:0, mist:0, blund:0 } };
+        var whiteCPLs = [], blackCPLs = [];
+        for (var i = 1; i < moveCPLArray.length; i++) {
+            var m = moves[i-1];
+            var side = m.color;
+            var cpl = moveCPLArray[i];
+            var prevEval = stockfishEvals[i-1] || 0;
+            var cls = classifyMoveByCPL(cpl, prevEval);
+            if (cls === 'blunder') stats[side].blund++;
+            else if (cls === 'mistake') stats[side].mist++;
+            else if (cls === 'inaccuracy') stats[side].inacc++;
+            else if (cls === 'great') stats[side].great++;
+            else if (cls === 'best') stats[side].best++;
+            if (side === 'w') whiteCPLs.push(cpl);
+            else blackCPLs.push(cpl);
+        }
+        var avgW = whiteCPLs.length ? whiteCPLs.reduce((a,b)=>a+b,0)/whiteCPLs.length : 0;
+        var avgB = blackCPLs.length ? blackCPLs.reduce((a,b)=>a+b,0)/blackCPLs.length : 0;
+        var wAcc = calculateAccuracyFromCPL(avgW);
+        var bAcc = calculateAccuracyFromCPL(avgB);
+        $('#stat-w-acc').html(wAcc.toFixed(1)+'%');
+        $('#stat-b-acc').html(bAcc.toFixed(1)+'%');
+        $('#stat-w-great').html(stats.w.great); $('#stat-b-great').html(stats.b.great);
+        $('#stat-w-best').html(stats.w.best); $('#stat-b-best').html(stats.b.best);
+        $('#stat-w-inacc').html(stats.w.inacc); $('#stat-b-inacc').html(stats.b.inacc);
+        $('#stat-w-mist').html(stats.w.mist); $('#stat-b-mist').html(stats.b.mist);
+        $('#stat-w-blund').html(stats.w.blund); $('#stat-b-blund').html(stats.b.blund);
+        
+        isAnalyzing = false;
+        $('#analysis-progress').hide();
+        $('.engine-spinner').hide();
+        renderMovesList();
+        updateDisplay();
+        goToMove(0);
+    }
+    
+    function updateDisplay() {
+        if (stockfishEvals[currentMoveIndex] !== undefined) {
+            var ev = stockfishEvals[currentMoveIndex];
+            $('#evalValue').html(ev > 0 ? '+' + ev.toFixed(1) : ev.toFixed(1));
+            var pct = Math.min(95, Math.max(5, 50 + (Math.min(2, Math.max(-2, ev)) * 15)));
+            $('#evalWhite').css('height', pct + '%');
+        }
+        // Jokių rodyklių
+    }
+    
+    function renderMovesList() {
+        var html = '';
+        for (var i = 0; i < movesList.length; i++) {
+            var move = movesList[i];
+            var evalStockfish = stockfishEvals[move.moveIndex] || 0;
+            var evalShort = Math.abs(evalStockfish) > 0.1 ? (evalStockfish > 0 ? '+' + evalStockfish.toFixed(1) : evalStockfish.toFixed(1)) : '';
+            var activeClass = (currentMoveIndex === move.moveIndex) ? 'active' : '';
+            var cpl = moveCPL[move.moveIndex] || 0;
+            var cplClass = cpl > 300 ? '🔴' : (cpl > 150 ? '🟠' : (cpl > 80 ? '🟡' : ''));
+            html += `<div class="move-item ${activeClass}" data-move-index="${move.moveIndex}">`;
+            html += `<span class="move-number">${move.number}.</span>`;
+            html += `<span class="${move.color === 'w' ? 'white-move' : 'black-move'} move-san">${move.san}</span>`;
+            if (evalShort) html += `<span class="move-eval">${evalShort}</span>`;
+            if (cplClass) html += `<span style="margin-left:5px;">${cplClass}</span>`;
+            html += `</div>`;
+        }
+        $('#moves-list').html(html);
+        $('.move-item').on('click', function() {
+            var idx = parseInt($(this).data('move-index'));
+            if (!isNaN(idx) && idx >= 0 && idx < moveHistory.length) goToMove(idx);
+        });
+    }
+    
+    // ========== GEMINI KOMENTARAI ==========
+    const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyRY_QYb3ixZCEjcQYplyRuAK0IWFfxCr72HuCeuX3lrRAFrYY7lYDbk3FsjUKTWcSg/exec'; // <-- ĮRAŠYK SAVO URL
+    
+    async function getGeminiComment(moveIndex) {
+        if (moveIndex === 0) return "♟️ Pradinė pozicija. Pasirinkite ėjimą.";
+        if (!stockfishEvals[moveIndex]) return "🔍 Analizuojama...";
+        if (commentCache.has(moveIndex)) return commentCache.get(moveIndex);
+        
+        var move = verboseHistory[moveIndex];
+        if (!move || !move.san) return "Nėra informacijos apie ėjimą.";
+        
+        var fen = moveHistory[moveIndex];
+        var best = bestMoveSAN[moveIndex] || bestLines[moveIndex]?.split(' ')[0] || '';
+        var cpl = moveCPL[moveIndex] || 0;
+        var evalBefore = stockfishEvals[moveIndex-1] || 0;
+        var evalAfter = stockfishEvals[moveIndex] || 0;
+        
+        var url = `${GOOGLE_SCRIPT_URL}?move=${encodeURIComponent(move.san)}&fen=${encodeURIComponent(fen)}&best=${encodeURIComponent(best)}&cpl=${cpl}&evalBefore=${evalBefore}&evalAfter=${evalAfter}`;
+        try {
+            var response = await fetch(url);
+            var text = await response.text();
+            if (text && !text.startsWith('Trūksta parametrų') && !text.startsWith('Klaida')) {
+                commentCache.set(moveIndex, text);
+                return text;
+            } else {
+                return "🤖 Treneris šiuo metu negali atsakyti. Bandykite vėliau.";
+            }
+        } catch(e) {
+            console.error(e);
+            return "Klaida gaunant AI komentarą.";
+        }
+    }
+    
+    async function goToMove(index) {
+        if (index < 0 || index >= moveHistory.length) return;
+        currentMoveIndex = index;
+        game.load(moveHistory[currentMoveIndex]);
+        if (board) board.position(moveHistory[currentMoveIndex]);
+        
+        $('#commentary-text').html('🤖 Treneris galvoja...');
+        var comment = await getGeminiComment(currentMoveIndex);
+        $('#commentary-text').html(comment);
+        
+        updateDisplay();
+        renderMovesList();
+        var commentaryBox = document.getElementById('commentary-box');
+if (commentaryBox) commentaryBox.scrollTop = 0;
+    }
+    
+    // ========== STOCKFISH INICIJAVIMAS ==========
+    function initStockfish() {
+        try {
+            stockfish = new Worker('stockfish.js');
+            var startupTimeout = setTimeout(() => {
+                if (!stockfishReady && !stockfishErrorShown) {
+                    stockfishErrorShown = true;
+                    $('#engine-status').hide();
+                    $('#engine-error').show();
+                    $('.engine-spinner').hide();
+                    $('#commentary-text').html('⚠️ Stockfish nepasiekiamas!');
+                }
+            }, 3000);
+            stockfish.onmessage = function(e) {
+                var line = e.data;
+                if (line === 'uciok') {
+                    clearTimeout(startupTimeout);
+                    stockfishReady = true;
+                    $('#engine-status').show();
+                    $('#engine-error').hide();
+                    $('.engine-spinner').show();
+                } else if (line.indexOf('depth') !== -1) {
+                    parseAnalysisOutput(line);
+                }
+            };
+            stockfish.onerror = function() {
+                if (!stockfishErrorShown) {
+                    stockfishErrorShown = true;
+                    $('#engine-status').hide();
+                    $('#engine-error').show();
+                    $('.engine-spinner').hide();
+                }
+                stockfishReady = false;
+            };
+            stockfish.postMessage('uci');
+        } catch(e) { console.error(e); }
+    }
+    
+    // ========== EVENTAI ==========
+    $('#btnLoad').on('click', async function() {
+        var pgnText = $('#pgnInput').val();
+        if (!pgnText) { alert('Įklijuok PGN partiją!'); return; }
+        if (!stockfishReady) { alert('Palaukite, kol Stockfish užsikraus...'); return; }
+        
+        gameMetadata = extractMetadata(pgnText);
+        updateGameInfoUI();
+        var tempGame = new Chess();
+        if (!tempGame.load_pgn(pgnText)) { alert('Klaida: Neteisingas PGN formatas!'); return; }
+        
+        game = new Chess();
+        moveHistory = [game.fen()];
+        verboseHistory = [null];
+        var moves = tempGame.history({ verbose: true });
+        movesList = [];
+        for (var i = 0; i < moves.length; i++) {
+            game.move(moves[i]);
+            moveHistory.push(game.fen());
+            verboseHistory.push(moves[i]);
+            var moveNum = Math.floor((i+2)/2);
+            movesList.push({ moveIndex: i+1, number: moveNum, san: moves[i].san, color: moves[i].color });
+        }
+        
+        $('#summary-box').show();
+        $('#btnClearPgn').show();
+        $('#pgnInput').prop('disabled', true);
+        $('#commentary-text').html('<div class="analyzing">🔍 Analizuojama... gali užtrukti 20-40 sek.</div>');
+        analysisCache.clear();
+        commentCache.clear();
+        await analyzeAllPositions(moves);
+    });
+    
+    $('#btnClearPgn').on('click', function() {
+        $('#pgnInput').val('').prop('disabled', false);
+        $('#pgnFile').val('');
+        $('#btnClearPgn').hide();
+        $('#summary-box').hide();
+        movesList = [];
+        commentCache.clear();
+        stockfishEvals = [];
+        bestMoveSAN = [];
+        analysisCache.clear();
+        renderMovesList();
+        $('#commentary-text').html('Laukiama PGN partijos...');
+        currentMoveIndex = 0;
+        game.load(new Chess().fen());
+        if (board) board.position('start');
+        $('#evalValue').html('0.0');
+        $('#evalWhite').css('height', '50%');
+    });
+    
+    $('#btnStart').on('click', function() { goToMove(0); });
+    $('#btnPrev').on('click', function() { goToMove(currentMoveIndex-1); });
+    $('#btnNext').on('click', function() { goToMove(currentMoveIndex+1); });
+    $('#btnEnd').on('click', function() { goToMove(moveHistory.length-1); });
+    
+    document.getElementById('pgnFile').addEventListener('change', function(e) {
+        var file = e.target.files[0];
+        if (!file) return;
+        var reader = new FileReader();
+        reader.onload = function(evt) { document.getElementById('pgnInput').value = evt.target.result; };
+        reader.readAsText(file);
+    });
+    
+    $(document).ready(function() {
+        board = Chessboard('board', { draggable: true, position: 'start', pieceTheme: 'https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png' });
+        initStockfish();
+    });
+</script>
+</body>
+</html>
